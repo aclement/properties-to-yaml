@@ -45,7 +45,62 @@ public class PropertiesToYamlConverter {
 	private static final Pattern COMMENT = Pattern.compile("(?m)^\\s*(\\#|\\!)");
 
 	public PropertiesToYamlConverter() {
+	}
+	
+	public YamlConversionResult convert(File f) {
+		Properties p = new Properties();
+		try {
+			String content = new String(Files.readAllBytes(Paths.get(f.toURI())));
+			if (hasComments(content)) {
+				status.addWarning("The properties file has comments, which will be lost in the refactoring!");
+			}
+			p.load(new StringReader(content));
+		} catch (IOException e) {
+			status.addError("Problem loading file "+f+": "+e.getMessage());
+		}
+		return convert(p);
+	}
+	
+	public YamlConversionResult convert(String properties) {
+		Properties p = new Properties();
+		try {
+			p.load(new StringReader(properties));
+		} catch (IOException e) {
+			status.addError("Problem processing properties: "+e.getMessage());
+		}
+		return convert(p);
+	}
 
+	public YamlConversionResult convert(Properties p) {
+		Map<String, Collection<String>> propertiesMap = new HashMap<>();
+		for (Entry<Object, Object> e : p.entrySet()) {
+			Set<String> s = new LinkedHashSet<>();
+			s.add((String) e.getValue());
+			propertiesMap.put((String) e.getKey(), s);
+		}
+		return convert(propertiesMap);
+	}
+
+	public YamlConversionResult convert(Map<String, Collection<String>> properties) {
+		if (properties.isEmpty()) {
+			output = "";
+			return YamlConversionResult.EMPTY;
+		}
+		YamlBuilder root = new YamlBuilder(YamlPath.EMPTY);
+		for (Entry<String, Collection<String>> e : properties.entrySet()) {
+			for (String v : e.getValue()) {
+				root.addProperty(YamlPath.fromProperty(e.getKey()), v);
+			}
+		}
+		Object object = root.build();
+
+		DumperOptions options = new DumperOptions();
+		options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+		options.setPrettyFlow(true);
+
+		Yaml yaml = new Yaml(options);
+		this.output = yaml.dump(object);
+		return new YamlConversionResult(status, output);
 	}
 
 	class YamlBuilder {
@@ -129,55 +184,10 @@ public class PropertiesToYamlConverter {
 		}
 	}
 
-	public YamlConversionResult convert(File f) {
-		Properties p = new Properties();
-		try {
-			String content = new String(Files.readAllBytes(Paths.get(f.toURI())));
-			if (hasComments(content)) {
-				status.addWarning("The properties file has comments, which will be lost in the refactoring!");
-			}
-			p.load(new StringReader(content));
-		} catch (IOException e) {
-			status.addError("Problem loading file "+f+": "+e.getMessage());
-		}
-		return convert(p);
-	}
 	
     private boolean hasComments(String line) {
         return COMMENT.matcher(line).find();
     }
-
-	public YamlConversionResult convert(Properties p) {
-		Map<String, Collection<String>> propertiesMap = new HashMap<>();
-		for (Entry<Object, Object> e : p.entrySet()) {
-			Set<String> s = new LinkedHashSet<>();
-			s.add((String) e.getValue());
-			propertiesMap.put((String) e.getKey(), s);
-		}
-		return convert(propertiesMap);
-	}
-
-	public YamlConversionResult convert(Map<String, Collection<String>> properties) {
-		if (properties.isEmpty()) {
-			output = "";
-			return YamlConversionResult.EMPTY;
-		}
-		YamlBuilder root = new YamlBuilder(YamlPath.EMPTY);
-		for (Entry<String, Collection<String>> e : properties.entrySet()) {
-			for (String v : e.getValue()) {
-				root.addProperty(YamlPath.fromProperty(e.getKey()), v);
-			}
-		}
-		Object object = root.build();
-
-		DumperOptions options = new DumperOptions();
-		options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-		options.setPrettyFlow(true);
-
-		Yaml yaml = new Yaml(options);
-		this.output = yaml.dump(object);
-		return new YamlConversionResult(status, output);
-	}
 
 	static class YamlConversionResult {
 		ConversionStatus status;
