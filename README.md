@@ -16,7 +16,7 @@ String expected =
   "  b:\n"+
   "    c: '1'\n"+
   "    d: '2'\n";
-  if (!result.getYaml().equals(expected)) {
-    throw new IllegalStateException("Not expected result! "+result.getYaml());
-  }
+if (!result.getYaml().equals(expected)) {
+  throw new IllegalStateException("Not expected result! "+result.getYaml());
+}
 ```
